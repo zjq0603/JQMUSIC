@@ -1,0 +1,27 @@
+{
+  "name": "jqmusic",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Private, ad-free music player for a personal Navidrome library",
+  "scripts": {
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "nodemon server/index.js",
+    "dev:client": "vue-cli-service serve",
+    "start": "node server/index.js",
+    "build": "vue-cli-service build",
+    "test": "node --test server/test/navidrome.test.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "mysql2": "^3.12.0",
+    "vue": "^2.7.16"
+  },
+  "devDependencies": {
+    "@vue/cli-service": "^5.0.8",
+    "concurrently": "^9.1.2",
+    "nodemon": "^3.1.9",
+    "vue-template-compiler": "^2.7.16"
+  }
+}
