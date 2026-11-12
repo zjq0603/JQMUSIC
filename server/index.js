@@ -5,6 +5,8 @@ const path = require('path')
 const mysql = require('mysql2/promise')
 const { createSubsonicClient } = require('./navidrome')
 const { createJamendoClient } = require('./jamendo')
+const { createAppleMusicClient } = require('./appleMusic')
+const { searchITunes } = require('./itunes')
 
 const localConfigPath = path.resolve(process.cwd(), 'config.json')
 const configPath = fs.existsSync(localConfigPath) ? localConfigPath : path.resolve(process.cwd(), 'config.example.json')
@@ -15,6 +17,7 @@ app.use(express.json({ limit: '1mb' }))
 let pool
 const library = createSubsonicClient(config.navidrome)
 const jamendo = createJamendoClient(config.jamendo)
+const appleMusic = createAppleMusicClient(config.appleMusic)
 
 function asyncRoute(handler) {
   return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next)
@@ -29,7 +32,7 @@ function mapStoredSong(row) {
     id: row.id, title: row.title, artist: row.artist_name || '未知艺术家', album: row.album_name || '单曲',
     duration: row.duration || 0, cover: row.cover_url || '', stream: row.audio_url || '',
     source: row.source_name, sourcePlatformId: row.source_platform_id, type: row.source_type,
-    licenseType: row.license_type || '', licenseUrl: row.license_url || ''
+    licenseType: row.license_type || '', licenseUrl: row.license_url || '', appleMusic: row.source_name === 'Apple Music'
   }
 }
 
@@ -95,6 +98,20 @@ app.get('/api/jamendo/search', asyncRoute(async (req, res) => {
   res.json({ songs: [...songsById.values()] })
 }))
 app.get('/api/jamendo/status', (req, res) => res.json({ configured: Boolean(config.jamendo?.clientId) }))
+app.get('/api/apple-music/status', (req, res) => res.json(appleMusic.status()))
+app.get('/api/apple-music/token', asyncRoute(async (req, res) => res.json({ developerToken: appleMusic.token(), storefront: appleMusic.status().storefront })))
+app.get('/api/apple-music/search', asyncRoute(async (req, res) => {
+  const q = String(req.query.q || '').trim()
+  if (q.length < 2) return res.status(400).json({ error: '请输入至少 2 个字符进行搜索' })
+  if (q.length > 120) return res.status(400).json({ error: '搜索内容不能超过 120 个字符' })
+  res.json({ songs: await appleMusic.search(q) })
+}))
+app.get('/api/itunes/search', asyncRoute(async (req, res) => {
+  const q = String(req.query.q || '').trim()
+  if (q.length < 2) return res.status(400).json({ error: '请输入至少 2 个字符进行搜索' })
+  if (q.length > 120) return res.status(400).json({ error: '搜索内容不能超过 120 个字符' })
+  res.json({ songs: await searchITunes(q) })
+}))
 app.get('/api/jamendo/playlists/:id', asyncRoute(async (req, res) => {
   if (!/^\d{1,12}$/.test(req.params.id)) return res.status(400).json({ error: 'Jamendo 歌单编号无效' })
   const playlist = await jamendo.playlist(req.params.id)

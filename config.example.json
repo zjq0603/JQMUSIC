@@ -2,5 +2,6 @@
   "server": { "port": 3000, "host": "127.0.0.1" },
   "mysql": { "host": "127.0.0.1", "port": 3306, "user": "jqmusic", "password": "change-this-password", "database": "jqmusic", "connectionLimit": 10 },
   "navidrome": { "url": "http://127.0.0.1:4533", "username": "admin", "password": "change-this-password", "client": "jqmusic", "version": "1.0.0" },
-  "jamendo": { "clientId": "" }
+  "jamendo": { "clientId": "" },
+  "appleMusic": { "teamId": "", "keyId": "", "privateKeyPath": "apple-music/AuthKey.p8", "storefront": "cn", "tokenHours": 24, "origins": ["http://localhost:8081"] }
 }

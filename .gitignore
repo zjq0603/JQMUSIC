@@ -8,4 +8,5 @@ config.json
 music/*
 !music/.gitkeep
 navidrome-data/
+apple-music/*.p8
 .idea/

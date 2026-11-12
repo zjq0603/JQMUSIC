@@ -24,6 +24,14 @@
 
 播放器只使用 Jamendo 官方 API 返回的曲目和音频地址，并保留歌曲来源、平台 ID、授权类型及许可链接。不同曲目适用的 Creative Commons 条款可能不同，使用、分享或再发布前请打开许可链接核对条款；本项目不提供音频下载，也不绕过登录、付费或 DRM。尚未配置 ID、API 暂不可用或歌单不可访问时，页面会显示服务端错误信息。
 
+## Apple Music 正式授权曲库
+
+未配置 Apple Developer 时，“Apple Music”页面会先使用 Apple 公开的 iTunes Search API 搜索中国区歌曲，并播放官方提供的约 30 秒宣传试听。试听内容不下载、不缓存，曲目列表保留跳转 Apple Music/商店的链接。这不是完整歌曲免费播放。
+
+Apple Music 接入需要 Apple Developer Program、启用 MusicKit 的 Media ID、Media Services 私钥，以及有效 Apple Music 订阅。将 `.p8` 私钥放到本机 `apple-music/` 目录，并在 `config.json` 中配置 `appleMusic.teamId`、`keyId`、`privateKeyPath`、`storefront` 和允许的本机来源。私钥目录已被 Git 忽略。
+
+配置完成并重启服务后，在“Apple Music”页面登录自己的账户，即可通过官方 MusicKit 搜索和播放订阅曲库。Apple Music 音频不会下载或保存到 Navidrome；收藏和歌单只保存曲目元数据及 Apple Music 曲目 ID。
+
 Navidrome 负责读取音乐标签、封面、搜索和音频流；本项目不会复制、上传或转换音乐文件。进度拖动通过 HTTP Range 转发。Navidrome 认证令牌留在 Node 服务端。
 
 ## 验证
