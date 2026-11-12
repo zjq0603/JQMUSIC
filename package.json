@@ -9,7 +9,7 @@
     "dev:client": "vue-cli-service serve",
     "start": "node server/index.js",
     "build": "vue-cli-service build",
-    "test": "node --test server/test/navidrome.test.js"
+    "test": "node --test server/test/navidrome.test.js server/test/jamendo.test.js"
   },
   "dependencies": {
     "axios": "^1.7.9",

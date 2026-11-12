@@ -57,6 +57,10 @@ function createSubsonicClient(config) {
       const result = await call('getSong', { id })
       return result.song ? mapSong(result.song) : null
     },
+    async lyrics(artist, title) {
+      const result = await call('getLyrics', { artist, title })
+      return result.lyrics || null
+    },
     async resolve(ids) {
       const songs = await Promise.all(ids.slice(0, 100).map(id => this.song(id)))
       return songs.filter(Boolean)
