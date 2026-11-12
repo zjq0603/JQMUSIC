@@ -1,6 +1,6 @@
 <template>
   <div class="app-shell">
-    <aside class="sidebar">
+    <aside class="sidebar" :class="{ 'mobile-open': mobileMenuOpen }">
       <a class="brand" href="#"><span class="brand-mark">♫</span><span>JQ<span class="brand-light"> MUSIC</span></span></a>
       <div class="nav-label">音乐库</div>
       <button class="nav-item" :class="{ active: view === 'home' }" @click="view = 'home'"><span class="nav-icon">⌂</span>发现</button>
@@ -15,6 +15,7 @@
 
     <main class="main-area">
       <header class="topbar">
+        <button class="icon-button mobile-menu-button" title="打开菜单" aria-label="打开菜单" @click="mobileMenuOpen = true">☰</button>
         <div class="history-actions"><button class="icon-button" title="返回" @click="view = 'home'">‹</button><button class="icon-button" title="前进" disabled>›</button></div>
         <label class="search-box"><span class="search-icon">⌕</span><input v-model="query" :placeholder="view === 'online' ? '搜索 Jamendo 免费音乐' : '搜索歌曲、歌手或专辑'" @input="onSearch"><kbd>⌘ K</kbd></label>
         <button class="profile-button" :class="{ spinning: isPlaying }" title="个人音乐库">J</button>
@@ -72,10 +73,11 @@
         <button class="play-button" :title="isPlaying ? '暂停' : '播放'" :aria-label="isPlaying ? '暂停' : '播放'" @click="togglePlay"><svg v-if="isPlaying" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-fill" d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg><svg v-else viewBox="0 0 24 24" aria-hidden="true"><path class="icon-fill" d="m8 5 11 7-11 7z"/></svg></button>
         <button class="icon-button" title="下一首" aria-label="下一首" @click="next"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="icon-fill" d="M15 5h2v14h-2zM6 6v12l8-6z"/></svg></button>
         <button class="icon-button" :title="repeat === 'one' ? '单曲循环' : '列表循环'" :class="{ selected: repeat === 'one' }" aria-label="切换循环模式" @click="repeat = repeat === 'all' ? 'one' : 'all'"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/><text v-if="repeat === 'one'" x="12" y="15">1</text></svg></button>
-      </div><div class="progress-row"><span>{{ formatTime(position) }}</span><input v-model.number="position" type="range" min="0" :max="duration || 1" @input="seek"><span>{{ formatTime(duration) }}</span></div></div>
+      </div><div class="progress-row"><span>{{ formatTime(position) }}</span><input v-model.number="position" type="range" min="0" :max="duration || 1" @pointerdown="seeking = true" @touchstart="seeking = true" @input="previewSeek" @pointerup="finishSeek" @touchend="finishSeek" @change="finishSeek"><span>{{ formatTime(duration) }}</span></div></div>
       <div class="player-extras"><button class="icon-button queue-button" title="播放队列" @click="queueOpen = !queueOpen">☷<span v-if="queue.length" class="queue-count">{{ queue.length }}</span></button><span class="volume-icon">◖</span><input v-model.number="volume" aria-label="音量" type="range" min="0" max="1" step="0.01" @input="setVolume"></div>
       <div v-if="queueOpen" class="queue-popover"><div class="queue-head"><strong>播放队列</strong><button class="icon-button" @click="queueOpen = false">×</button></div><div v-for="(track, i) in queue" :key="track.id + i" class="queue-row" @click="playAt(i)"><span>{{ i + 1 }}</span><div><strong>{{ track.title }}</strong><small>{{ track.artist }}</small></div><button class="icon-button" title="从队列移除" @click.stop="queue.splice(i, 1)">×</button></div><div v-if="!queue.length" class="queue-empty">队列为空</div></div>
     </footer>
+    <button v-if="mobileMenuOpen" class="mobile-menu-backdrop" aria-label="关闭菜单" @click="mobileMenuOpen = false"></button>
     <audio ref="audio" @timeupdate="syncTime" @loadedmetadata="syncDuration" @ended="onEnded" @play="isPlaying = true" @pause="isPlaying = false" @error="audioError"></audio>
     <div v-if="lyricsOpen" class="lyrics-overlay"><header class="lyrics-header"><button class="icon-button" title="关闭歌词" @click="lyricsOpen = false">×</button><span>正在播放</span><span></span></header><div class="lyrics-content"><img class="lyrics-cover" :src="current && current.cover || placeholder" alt=""><strong class="lyrics-track-title">{{ current && current.title }}</strong><span class="lyrics-track-artist">{{ current && current.artist }}</span><div v-if="lyricsLoading" class="lyrics-empty">正在读取歌词…</div><div v-else-if="!lyricLines.length" class="lyrics-empty">{{ current && current.type === 'ONLINE' ? '该在线曲目暂未提供歌词' : '暂无歌词' }}</div><div v-else ref="lyricsList" class="lyrics-list"><button v-for="(line, index) in lyricLines" :key="index" :ref="'lyric-' + index" class="lyric-line" :class="{ active: index === activeLyricIndex }" @click="seekToLyric(line.time)">{{ line.text || '♪' }}</button></div><span v-if="lyricsSource" class="lyrics-source">歌词来源：{{ lyricsSource }}</span></div></div>
     <div v-if="showPlaylistDialog" class="modal-backdrop" @click.self="showPlaylistDialog = false"><form class="modal" @submit.prevent="savePlaylist"><div class="modal-title"><h2>新建歌单</h2><button type="button" class="icon-button" @click="showPlaylistDialog = false">×</button></div><label>歌单名称<input v-model="playlistName" autofocus maxlength="120" placeholder="给歌单起个名字"></label><div class="modal-actions"><button type="button" class="secondary-button" @click="showPlaylistDialog = false">取消</button><button class="primary-button" :disabled="!playlistName.trim()">创建歌单</button></div></form></div>
@@ -97,14 +99,14 @@ const SongTable = {
 
 export default {
   components: { SongTable },
-  data() { return { view: 'home', query: '', songs: [], albums: [], playlists: [], favorites: [], playlistSongs: [], current: null, queue: [], queueOpen: false, queueIndex: -1, isPlaying: false, shuffle: false, repeat: 'all', volume: 0.72, position: 0, duration: 0, loading: false, connected: false, error: '', showPlaylistDialog: false, playlistName: '', activePlaylist: null, selectedAlbum: null, searchTimer: null, jamendoPlaylistInput: '', jamendoLoading: false, jamendoConfigured: false, onlinePlaylist: null, lyricsOpen: false, lyricsLoading: false, lyricLines: [], lyricsSource: '', lyricSongId: '', activeLyricIndex: -1, placeholder } },
+  data() { return { view: 'home', query: '', songs: [], albums: [], playlists: [], favorites: [], playlistSongs: [], current: null, queue: [], queueOpen: false, queueIndex: -1, isPlaying: false, shuffle: false, repeat: 'all', volume: 0.72, position: 0, duration: 0, seeking: false, loading: false, connected: false, error: '', showPlaylistDialog: false, playlistName: '', activePlaylist: null, selectedAlbum: null, searchTimer: null, jamendoPlaylistInput: '', jamendoLoading: false, jamendoConfigured: false, onlinePlaylist: null, lyricsOpen: false, lyricsLoading: false, lyricLines: [], lyricsSource: '', lyricSongId: '', activeLyricIndex: -1, mobileMenuOpen: false, placeholder } },
   computed: {
     pageTitle() { if (this.view === 'favorites') return '喜欢的音乐'; if (this.view === 'albums') return '专辑'; if (this.view === 'online') return '在线音乐'; if (this.view.startsWith('playlist:')) return this.activePlaylist?.name || '我的歌单'; if (this.view === 'album') return this.selectedAlbum?.name || '专辑'; return '你好，音乐爱好者' },
     greeting() { const h = new Date().getHours(); return h < 11 ? '早上好' : h < 18 ? '下午好' : '晚上好' }
   },
   created() { this.loadHome(); this.loadPlaylists(); this.loadFavorites(); this.loadView = this.loadHome; window.addEventListener('keydown', this.keyboard) },
   beforeDestroy() { window.removeEventListener('keydown', this.keyboard); clearTimeout(this.searchTimer) },
-  watch: { view() { this.query = ''; this.loadViewData() } },
+  watch: { view() { this.mobileMenuOpen = false; this.query = ''; this.loadViewData() } },
   methods: {
     async request(path, options) { const { data } = await api({ url: path, ...options }); return data },
     async loadHome() { this.loading = true; this.error = ''; try { const [recommendations, albumResult, favoriteResult] = await Promise.all([this.request('/recommendations'), this.request('/albums'), this.request('/favorites')]); this.songs = recommendations.songs; this.albums = albumResult.albums; this.favorites = favoriteResult.ids; this.connected = true } catch (error) { this.error = error.response?.data?.error || '请检查后台服务、数据库和音乐库配置'; this.connected = false } finally { this.loading = false } },
@@ -122,8 +124,9 @@ export default {
     previous() { if (this.position > 3) { this.$refs.audio.currentTime = 0; return } if (!this.queue.length) return; this.queueIndex = (this.queueIndex - 1 + this.queue.length) % this.queue.length; this.startCurrent(this.queue[this.queueIndex]) },
     onEnded() { if (this.repeat === 'one') { this.$refs.audio.currentTime = 0; this.$refs.audio.play() } else this.next() },
     togglePlay() { if (!this.current) return; if (this.isPlaying) this.$refs.audio.pause(); else this.$refs.audio.play().catch(() => { this.error = '播放失败，请检查音乐库连接' }) },
-    seek() { if (this.$refs.audio) this.$refs.audio.currentTime = this.position },
-    syncTime() { this.position = this.$refs.audio.currentTime || 0; this.updateActiveLyric() }, syncDuration() { this.duration = this.$refs.audio.duration || this.current?.duration || 0 }, setVolume() { this.$refs.audio.volume = this.volume },
+    previewSeek() { this.seeking = true },
+    finishSeek() { if (this.$refs.audio) this.$refs.audio.currentTime = this.position; this.seeking = false; this.updateActiveLyric() },
+    syncTime() { if (!this.seeking) this.position = this.$refs.audio.currentTime || 0; this.updateActiveLyric() }, syncDuration() { this.duration = this.$refs.audio.duration || this.current?.duration || 0 }, setVolume() { this.$refs.audio.volume = this.volume },
     async openLyrics() { if (!this.current) return; this.lyricsOpen = true; await this.loadLyrics(this.current) },
     async loadLyrics(song) { this.lyricsLoading = true; this.lyricLines = []; this.lyricsSource = ''; this.lyricSongId = song.id; try { const result = await this.request(`/lyrics/${encodeURIComponent(song.id)}`); if (this.current?.id !== song.id) return; this.lyricLines = this.parseLyrics(result.lyrics || ''); this.lyricsSource = result.source || ''; this.updateActiveLyric() } catch (error) { this.lyricLines = []; this.lyricsSource = '' } finally { this.lyricsLoading = false } },
     parseLyrics(text) { const lines = String(text || '').split(/\r?\n/).flatMap(line => { const times = [...line.matchAll(/\[(\d{1,2}):(\d{2}(?:\.\d{1,2})?)\]/g)]; const content = line.replace(/\[[^\]]*\]/g, '').trim(); if (!times.length) return content ? [{ time: null, text: content }] : []; return times.map(match => ({ time: Number(match[1]) * 60 + Number(match[2]), text: content })) }).sort((a, b) => (a.time ?? 0) - (b.time ?? 0)); return lines },
