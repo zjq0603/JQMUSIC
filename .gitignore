@@ -5,3 +5,7 @@ config.local.json
 config.json
 *.log
 .DS_Store
+music/*
+!music/.gitkeep
+navidrome-data/
+.idea/
