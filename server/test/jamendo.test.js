@@ -29,4 +29,5 @@ test('rejects tracks without a numeric ID or playable audio URL', () => {
 test('reports missing local Jamendo client ID without making a network request', async () => {
   const client = createJamendoClient({})
   await assert.rejects(client.search('jazz'), error => error.status === 503 && /client_id/.test(error.message))
+  await assert.rejects(client.popular({ offset: 30, limit: 30 }), error => error.status === 503 && /client_id/.test(error.message))
 })

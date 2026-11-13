@@ -81,21 +81,29 @@ app.get('/api/jamendo/search', asyncRoute(async (req, res) => {
   const q = String(req.query.q || '').trim()
   if (q.length < 2) return res.status(400).json({ error: '请输入至少 2 个字符进行搜索' })
   if (q.length > 120) return res.status(400).json({ error: '搜索内容不能超过 120 个字符' })
+  const offset = Math.max(0, Math.min(10000, Number.parseInt(req.query.offset, 10) || 0))
+  const limit = Math.max(10, Math.min(50, Number.parseInt(req.query.limit, 10) || 30))
   const pattern = `%${q}%`
-  const [rows] = await pool.execute(
+  const [rows] = offset === 0 ? await pool.execute(
     'SELECT * FROM music_song WHERE source_type = \'ONLINE\' AND source_name = \'Jamendo\' AND (title LIKE ? OR artist_name LIKE ? OR album_name LIKE ?) ORDER BY title LIMIT 50',
     [pattern, pattern, pattern]
-  )
+  ) : [[]]
   const savedSongs = rows.map(mapStoredSong)
   let remoteSongs = []
   try {
-    remoteSongs = await jamendo.search(q)
+    remoteSongs = await jamendo.search(q, { offset, limit })
   } catch (error) {
     if (!savedSongs.length) throw error
     console.warn(`[${new Date().toISOString()}] Jamendo API search unavailable; returning saved matches: ${error.message}`)
   }
   const songsById = new Map([...savedSongs, ...remoteSongs].map(song => [song.id, song]))
-  res.json({ songs: [...songsById.values()] })
+  res.json({ songs: [...songsById.values()], nextOffset: offset + remoteSongs.length, hasMore: remoteSongs.length === limit })
+}))
+app.get('/api/jamendo/tracks', asyncRoute(async (req, res) => {
+  const offset = Math.max(0, Math.min(10000, Number.parseInt(req.query.offset, 10) || 0))
+  const limit = Math.max(10, Math.min(50, Number.parseInt(req.query.limit, 10) || 30))
+  const songs = await jamendo.popular({ offset, limit })
+  res.json({ songs, nextOffset: offset + songs.length, hasMore: songs.length === limit })
 }))
 app.get('/api/jamendo/status', (req, res) => res.json({ configured: Boolean(config.jamendo?.clientId) }))
 app.get('/api/apple-music/status', (req, res) => res.json(appleMusic.status()))

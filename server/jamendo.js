@@ -55,10 +55,23 @@ function createJamendoClient(config = {}) {
       })
       return results.map(normalizeTrack).filter(Boolean)
     },
-    async search(query) {
+    async popular({ offset = 0, limit = 30 } = {}) {
+      const results = await request('/tracks/', {
+        offset: offset || undefined,
+        limit,
+        type: 'single albumtrack',
+        audioformat: 'mp32',
+        imagesize: 150,
+        include: 'licenses',
+        order: 'popularity_total'
+      })
+      return results.map(normalizeTrack).filter(Boolean)
+    },
+    async search(query, { offset = 0, limit = 30 } = {}) {
       const results = await request('/tracks/', {
         search: query,
-        limit: 50,
+        offset: offset || undefined,
+        limit,
         type: 'single albumtrack',
         audioformat: 'mp32',
         imagesize: 150,
