@@ -18,7 +18,8 @@
       <header class="topbar">
         <button class="icon-button mobile-menu-button" title="打开菜单" aria-label="打开菜单" @click="mobileMenuOpen = true">☰</button>
         <div class="history-actions"><button class="icon-button" title="返回" @click="view = 'home'">‹</button><button class="icon-button" title="前进" disabled>›</button></div>
-        <label class="search-box"><span class="search-icon">⌕</span><input v-model="query" :placeholder="view === 'online' ? '搜索 Jamendo 免费音乐' : view === 'apple' ? '搜索 Apple Music 华语歌曲' : '搜索歌曲、歌手或专辑'" @input="onSearch"><kbd>⌘ K</kbd></label>
+        <label class="search-box"><span class="search-icon" :class="{ searching: searchLoading }"><i v-if="searchLoading" class="search-spinner"></i><template v-else>⌕</template></span><input v-model="query" :placeholder="view === 'online' ? '搜索 Jamendo 免费音乐' : view === 'apple' ? '搜索 Apple Music 华语歌曲' : '搜索歌曲、歌手或专辑'" @input="onSearch"><kbd>⌘ K</kbd></label>
+        <div class="listening-time" :class="{ playing: isPlaying }" title="累计听歌时长"><span class="listening-equalizer" aria-hidden="true"><i></i><i></i><i></i></span><span class="listening-time-value">{{ formatListeningTime(listeningSeconds) }}</span></div>
         <button class="profile-button" :class="{ spinning: isPlaying }" title="个人音乐库">Z.</button>
       </header>
 
@@ -27,8 +28,9 @@
         <div v-if="error" class="notice"><span>音乐库暂不可用</span><span>{{ error }}</span><button @click="loadHome">重试</button></div>
         <template v-if="query.trim()">
           <div class="section-heading"><h2>搜索结果</h2><span>{{ songs.length }} 首歌曲</span></div>
+          <div v-if="searchLoading" class="search-progress" role="status"><i class="search-spinner"></i><span>{{ view === 'online' ? '正在搜索 Jamendo 音乐…' : view === 'apple' ? '正在搜索 Apple 官方曲库…' : '正在搜索本地与在线音乐…' }}</span></div>
           <song-table :songs="songs" :current-id="current && current.id" :favorites="favorites" :playlists="playlists" @play="playSong" @favorite="toggleFavorite" @queue="queueSong" @add="addToPlaylist" />
-          <div v-if="!songs.length && !loading" class="blank-state">没有找到匹配的歌曲</div>
+          <div v-if="!songs.length && !searchLoading" class="blank-state">没有找到匹配的歌曲</div>
         </template>
         <template v-else-if="view === 'home'">
           <div class="feature-band">
@@ -49,15 +51,16 @@
             <div v-if="onlinePlaylist" class="imported-playlist"><div class="imported-playlist-head"><div><div class="eyebrow">JAMENDO 公共歌单</div><h3>{{ onlinePlaylist.name }}</h3><span v-if="onlinePlaylist.owner">创建者：{{ onlinePlaylist.owner }}</span></div><button class="secondary-button" :disabled="!onlinePlaylist.songs.length || !playlists.length" @click="addJamendoPlaylist">全部导入到我的歌单</button></div><p class="import-limit">当前载入 {{ onlinePlaylist.songs.length }} 首。Jamendo API 对聚合曲目数量有限制，超出部分不会显示。</p><div class="section-heading"><h2>歌单曲目</h2><span>{{ onlinePlaylist.songs.length }} 首歌曲</span></div></div>
           </template>
           <song-table :songs="songs" :current-id="current && current.id" :favorites="favorites" :playlists="playlists" @play="playSong" @favorite="toggleFavorite" @queue="queueSong" @add="addToPlaylist" />
-          <div v-if="!songs.length && !loading && query.trim()" class="blank-state">没有找到匹配的免费曲目</div>
-          <div v-if="!songs.length && !loading && !query.trim() && !onlinePlaylist" class="online-empty">输入上方搜索框搜索曲目，或粘贴 Jamendo 公开歌单链接。</div>
-          <div v-if="!songs.length && !loading && onlinePlaylist" class="blank-state">该歌单没有可试听的曲目</div>
+          <div v-if="searchLoading && query.trim()" class="search-progress" role="status"><i class="search-spinner"></i><span>正在搜索 Jamendo 曲目…</span></div>
+          <div v-if="!songs.length && !searchLoading && query.trim()" class="blank-state">没有找到匹配的免费曲目</div>
+          <div v-if="!songs.length && !searchLoading && !query.trim() && !onlinePlaylist" class="online-empty">输入上方搜索框搜索曲目，或粘贴 Jamendo 公开歌单链接。</div>
+          <div v-if="!songs.length && !searchLoading && onlinePlaylist" class="blank-state">该歌单没有可试听的曲目</div>
         </template>
         <template v-else-if="view === 'apple'">
           <div class="apple-intro"><div><div class="eyebrow">Apple 官方华语曲库</div><h2>iTunes 试听</h2><p>无需开发者账户即可搜索中国区歌曲并播放约 30 秒官方试听。完整播放仍需要后续配置 MusicKit 和有效 Apple Music 订阅。</p></div><button v-if="appleConfigured" class="apple-login-button" :disabled="appleLoading" @click="toggleAppleAuthorization">{{ appleAuthorized ? '已登录 Apple Music' : appleLoading ? '连接中…' : '登录完整曲库' }}</button></div>
           <div v-if="!appleConfigured" class="notice"><span>当前为公开试听模式</span><span>优先搜索中国大陆；大陆无结果时自动使用香港或台湾地区的官方 30 秒试听。以后配置 MusicKit 后可升级为订阅完整播放。</span></div>
           <div v-if="!query.trim()" class="online-empty">在顶部搜索周杰伦、林俊杰、陈奕迅等歌手或歌曲名称。</div>
-          <template v-if="query.trim()"><div class="section-heading"><h2>iTunes 中国区搜索结果</h2><span>{{ songs.length }} 首歌曲</span></div><song-table :songs="songs" :current-id="current && current.id" :favorites="favorites" :playlists="playlists" @play="playSong" @favorite="toggleFavorite" @queue="queueSong" @add="addToPlaylist" /><div v-if="!songs.length && !loading" class="blank-state">没有找到带官方试听的匹配歌曲</div></template>
+          <template v-if="query.trim()"><div class="section-heading"><h2>iTunes 中国区搜索结果</h2><span>{{ songs.length }} 首歌曲</span></div><div v-if="searchLoading" class="search-progress" role="status"><i class="search-spinner"></i><span>正在搜索 Apple 官方曲库…</span></div><song-table :songs="songs" :current-id="current && current.id" :favorites="favorites" :playlists="playlists" @play="playSong" @favorite="toggleFavorite" @queue="queueSong" @add="addToPlaylist" /><div v-if="!songs.length && !searchLoading" class="blank-state">没有找到带官方试听的匹配歌曲</div></template>
         </template>
         <template v-else-if="view === 'albums'">
           <div class="section-heading"><h2>全部专辑</h2><span>{{ albums.length }} 张专辑</span></div>
@@ -106,21 +109,62 @@ const SongTable = {
 
 export default {
   components: { SongTable },
-  data() { return { view: 'home', query: '', songs: [], albums: [], playlists: [], favorites: [], playlistSongs: [], current: null, queue: [], queueOpen: false, queueIndex: -1, isPlaying: false, shuffle: false, repeat: 'all', volume: 0.72, position: 0, duration: 0, seeking: false, loading: false, connected: false, error: '', showPlaylistDialog: false, playlistName: '', activePlaylist: null, selectedAlbum: null, searchTimer: null, jamendoPlaylistInput: '', jamendoLoading: false, jamendoConfigured: false, onlinePlaylist: null, appleConfigured: false, appleMissing: [], appleAuthorized: false, appleLoading: false, applePlayer: null, lyricsOpen: false, lyricsLoading: false, lyricLines: [], lyricsSource: '', lyricSongId: '', activeLyricIndex: -1, mobileMenuOpen: false, placeholder } },
+  data() { return { view: 'home', query: '', songs: [], albums: [], playlists: [], favorites: [], playlistSongs: [], current: null, queue: [], queueOpen: false, queueIndex: -1, isPlaying: false, listeningSeconds: 0, listeningTimer: null, shuffle: false, repeat: 'all', volume: 0.72, position: 0, duration: 0, seeking: false, loading: false, searchLoading: false, searchRequestId: 0, connected: false, error: '', showPlaylistDialog: false, playlistName: '', activePlaylist: null, selectedAlbum: null, searchTimer: null, jamendoPlaylistInput: '', jamendoLoading: false, jamendoConfigured: false, onlinePlaylist: null, appleConfigured: false, appleMissing: [], appleAuthorized: false, appleLoading: false, applePlayer: null, lyricsOpen: false, lyricsLoading: false, lyricLines: [], lyricsSource: '', lyricSongId: '', activeLyricIndex: -1, mobileMenuOpen: false, placeholder } },
   computed: {
     pageTitle() { if (this.view === 'favorites') return '喜欢的音乐'; if (this.view === 'albums') return '专辑'; if (this.view === 'online') return '在线音乐'; if (this.view === 'apple') return 'Apple Music'; if (this.view.startsWith('playlist:')) return this.activePlaylist?.name || '我的歌单'; if (this.view === 'album') return this.selectedAlbum?.name || '专辑'; return '你好，音乐爱好者' },
     greeting() { const h = new Date().getHours(); return h < 11 ? '早上好' : h < 18 ? '下午好' : '晚上好' }
   },
-  created() { this.loadHome(); this.loadPlaylists(); this.loadFavorites(); this.loadView = this.loadHome; window.addEventListener('keydown', this.keyboard) },
-  beforeDestroy() { window.removeEventListener('keydown', this.keyboard); clearTimeout(this.searchTimer) },
-  watch: { view() { this.mobileMenuOpen = false; this.query = ''; this.loadViewData() } },
+  created() { try { this.listeningSeconds = Math.max(0, Number(window.localStorage.getItem('jqmusic-listening-seconds')) || 0) } catch (error) { this.listeningSeconds = 0 } this.loadHome(); this.loadPlaylists(); this.loadFavorites(); this.loadView = this.loadHome; window.addEventListener('keydown', this.keyboard) },
+  beforeDestroy() { window.removeEventListener('keydown', this.keyboard); clearTimeout(this.searchTimer); this.stopListeningTimer() },
+  watch: { view() { clearTimeout(this.searchTimer); this.searchRequestId++; this.searchLoading = false; this.mobileMenuOpen = false; this.query = ''; this.loadViewData() }, isPlaying(playing) { if (playing) this.startListeningTimer(); else this.stopListeningTimer() } },
   methods: {
     async request(path, options) { const { data } = await api({ url: path, ...options }); return data },
+    formatListeningTime(value) { const seconds = Math.max(0, Math.floor(Number(value) || 0)); const hours = Math.floor(seconds / 3600); const minutes = Math.floor((seconds % 3600) / 60); return hours ? `${hours}h ${String(minutes).padStart(2, '0')}m` : `${minutes}m` },
+    startListeningTimer() { if (this.listeningTimer) return; this.listeningTimer = window.setInterval(() => { this.listeningSeconds++; try { window.localStorage.setItem('jqmusic-listening-seconds', String(this.listeningSeconds)) } catch (error) { /* keep counting for this session when storage is unavailable */ } }, 1000) },
+    stopListeningTimer() { if (this.listeningTimer) { window.clearInterval(this.listeningTimer); this.listeningTimer = null } try { window.localStorage.setItem('jqmusic-listening-seconds', String(this.listeningSeconds)) } catch (error) { /* storage can be disabled by browser privacy settings */ } },
     async loadHome() { this.loading = true; this.error = ''; try { const [recommendations, albumResult, favoriteResult] = await Promise.all([this.request('/recommendations'), this.request('/albums'), this.request('/favorites')]); this.songs = recommendations.songs; this.albums = albumResult.albums; this.favorites = favoriteResult.ids; this.connected = true } catch (error) { this.error = error.response?.data?.error || '请检查后台服务、数据库和音乐库配置'; this.connected = false } finally { this.loading = false } },
     async loadPlaylists() { try { this.playlists = (await this.request('/playlists')).playlists } catch (e) { this.error ||= '无法读取歌单，请检查数据库连接' } },
     async loadFavorites() { try { this.favorites = (await this.request('/favorites')).ids } catch (e) { /* connection is reported in the library state */ } },
     async loadViewData() { if (this.view === 'home' || this.view === 'albums') { if (!this.songs.length) this.loadHome(); return } if (this.view === 'online') { this.songs = []; this.onlinePlaylist = null; try { this.jamendoConfigured = (await this.request('/jamendo/status')).configured } catch (error) { this.error = '无法读取 Jamendo 配置状态' } return } if (this.view === 'apple') { this.songs = []; try { const status = await this.request('/apple-music/status'); this.appleConfigured = status.configured; this.appleMissing = status.missing || []; if (status.configured) await this.initAppleMusic() } catch (error) { this.error = '无法读取 Apple Music 配置状态' } return } try { if (this.view === 'favorites') { this.songs = (await this.request('/favorites/songs')).songs; return } if (this.view === 'album' && this.selectedAlbum) { this.songs = (await this.request(`/albums/${encodeURIComponent(this.selectedAlbum.id)}/songs`)).songs; return } if (this.view.startsWith('playlist:')) { const id = this.view.split(':')[1]; this.songs = (await this.request(`/playlists/${id}/tracks`)).songs; return } } catch (error) { this.error = error.response?.data?.error || '读取内容失败' } },
-    onSearch() { clearTimeout(this.searchTimer); const q = this.query.trim(); if (!q) { this.loadViewData(); return } this.searchTimer = setTimeout(async () => { this.loading = true; const params = { q }; try { if (this.view === 'online') this.songs = (await this.request('/jamendo/search', { params })).songs; else if (this.view === 'apple') this.songs = (await this.request(this.appleAuthorized ? '/apple-music/search' : '/itunes/search', { params })).songs; else { const [local, free, itunes] = await Promise.allSettled([this.request('/search', { params }), this.request('/jamendo/search', { params }), this.request('/itunes/search', { params })]); const localSongs = local.status === 'fulfilled' ? local.value.songs : []; const freeSongs = free.status === 'fulfilled' ? free.value.songs : []; const itunesSongs = itunes.status === 'fulfilled' ? itunes.value.songs : []; const byId = new Map([...localSongs, ...freeSongs, ...itunesSongs].map(song => [song.id, song])); this.songs = [...byId.values()]; if ([local, free, itunes].every(result => result.status === 'rejected')) throw local.reason; if (!this.songs.length && itunes.status === 'rejected') this.error = itunes.reason.response?.data?.error || '没有找到匹配歌曲' } this.onlinePlaylist = null; if (!this.error) this.error = '' } catch (error) { this.error = error.response?.data?.error || '搜索失败' } finally { this.loading = false } }, 300) },
+    onSearch() {
+      clearTimeout(this.searchTimer)
+      const requestId = ++this.searchRequestId
+      const q = this.query.trim()
+      if (!q) { this.searchLoading = false; this.loadViewData(); return }
+      this.searchLoading = true
+      this.searchTimer = setTimeout(async () => {
+        const params = { q }
+        try {
+          if (this.view === 'online') {
+            const result = await this.request('/jamendo/search', { params })
+            if (requestId !== this.searchRequestId) return
+            this.songs = result.songs
+          } else if (this.view === 'apple') {
+            const result = await this.request(this.appleAuthorized ? '/apple-music/search' : '/itunes/search', { params })
+            if (requestId !== this.searchRequestId) return
+            this.songs = result.songs
+          }
+          else {
+            const [local, free, itunes] = await Promise.allSettled([this.request('/search', { params }), this.request('/jamendo/search', { params }), this.request('/itunes/search', { params })])
+            if (requestId !== this.searchRequestId) return
+            const localSongs = local.status === 'fulfilled' ? local.value.songs : []
+            const freeSongs = free.status === 'fulfilled' ? free.value.songs : []
+            const itunesSongs = itunes.status === 'fulfilled' ? itunes.value.songs : []
+            const byId = new Map([...localSongs, ...freeSongs, ...itunesSongs].map(song => [song.id, song]))
+            this.songs = [...byId.values()]
+            if ([local, free, itunes].every(result => result.status === 'rejected')) throw local.reason
+            if (!this.songs.length && itunes.status === 'rejected') this.error = itunes.reason.response?.data?.error || '没有找到匹配歌曲'
+          }
+          if (requestId !== this.searchRequestId) return
+          this.onlinePlaylist = null
+          this.error = ''
+        } catch (error) {
+          if (requestId === this.searchRequestId) this.error = error.response?.data?.error || '搜索失败'
+        } finally {
+          if (requestId === this.searchRequestId) this.searchLoading = false
+        }
+      }, 300)
+    },
     async toggleFavorite(song) { const liked = this.favorites.includes(song.id); try { await api({ url: `/favorites/${encodeURIComponent(song.id)}`, method: liked ? 'delete' : 'put', data: liked ? undefined : { song } }); this.favorites = liked ? this.favorites.filter(id => id !== song.id) : [...this.favorites, song.id] } catch (error) { this.error = '收藏更新失败，请检查数据库连接' } },
     playSong(song) { this.queue = [...this.songs]; this.queueIndex = this.queue.findIndex(item => item.id === song.id); if (this.queueIndex < 0) { this.queue.unshift(song); this.queueIndex = 0 } this.startCurrent(song) },
     startCurrent(song) { this.current = song; this.position = 0; this.duration = song.duration || 0; this.lyricSongId = ''; if (this.lyricsOpen) this.loadLyrics(song); if (song.appleMusic) { this.playAppleSong(song); return } if (this.applePlayer) this.applePlayer.pause(); this.$nextTick(() => { const audio = this.$refs.audio; audio.src = song.stream; audio.volume = this.volume; audio.play().then(() => api.post(`/history/${encodeURIComponent(song.id)}`, { song })).catch(() => { this.isPlaying = false; this.error = '无法播放此歌曲，请检查音乐库和账号权限' }) }) },
