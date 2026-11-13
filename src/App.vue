@@ -24,7 +24,7 @@
       </header>
 
       <section class="content" :key="view">
-        <div class="welcome-row"><div><div class="eyebrow">你的私人音乐库</div><h1>{{ pageTitle }}</h1></div><div class="date-label">{{ greeting }}</div></div>
+        <div class="welcome-row"><div><div class="eyebrow">你的私人音乐库</div><h1>{{ pageTitle }}</h1><p class="music-blessing">愿每一首歌，都带来片刻好心情。</p></div><div class="date-label">{{ greeting }}</div></div>
         <div v-if="error" class="notice"><span>音乐库暂不可用</span><span>{{ error }}</span><button @click="loadHome">重试</button></div>
         <template v-if="query.trim()">
           <div class="section-heading"><h2>搜索结果</h2><span>{{ songs.length }} 首歌曲</span></div>
@@ -112,7 +112,7 @@ export default {
   data() { return { view: 'home', query: '', songs: [], albums: [], playlists: [], favorites: [], playlistSongs: [], current: null, queue: [], queueOpen: false, queueIndex: -1, isPlaying: false, listeningSeconds: 0, listeningTimer: null, shuffle: false, repeat: 'all', volume: 0.72, position: 0, duration: 0, seeking: false, loading: false, searchLoading: false, searchRequestId: 0, connected: false, error: '', showPlaylistDialog: false, playlistName: '', activePlaylist: null, selectedAlbum: null, searchTimer: null, jamendoPlaylistInput: '', jamendoLoading: false, jamendoConfigured: false, onlinePlaylist: null, appleConfigured: false, appleMissing: [], appleAuthorized: false, appleLoading: false, applePlayer: null, lyricsOpen: false, lyricsLoading: false, lyricLines: [], lyricsSource: '', lyricSongId: '', activeLyricIndex: -1, mobileMenuOpen: false, placeholder } },
   computed: {
     pageTitle() { if (this.view === 'favorites') return '喜欢的音乐'; if (this.view === 'albums') return '专辑'; if (this.view === 'online') return '在线音乐'; if (this.view === 'apple') return 'Apple Music'; if (this.view.startsWith('playlist:')) return this.activePlaylist?.name || '我的歌单'; if (this.view === 'album') return this.selectedAlbum?.name || '专辑'; return '你好，音乐爱好者' },
-    greeting() { const h = new Date().getHours(); return h < 11 ? '早上好' : h < 18 ? '下午好' : '晚上好' }
+    greeting() { const h = new Date().getHours(); return h < 11 ? 'Good morning.' : h < 18 ? 'Good afternoon.' : 'Good evening.' }
   },
   created() { try { this.listeningSeconds = Math.max(0, Number(window.localStorage.getItem('jqmusic-listening-seconds')) || 0) } catch (error) { this.listeningSeconds = 0 } this.loadHome(); this.loadPlaylists(); this.loadFavorites(); this.loadView = this.loadHome; window.addEventListener('keydown', this.keyboard) },
   beforeDestroy() { window.removeEventListener('keydown', this.keyboard); clearTimeout(this.searchTimer); this.stopListeningTimer() },

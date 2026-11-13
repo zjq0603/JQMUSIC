@@ -6,5 +6,11 @@ module.exports = {
     proxy: { '/api': { target: 'http://127.0.0.1:3000' } }
   },
   productionSourceMap: false,
-  configureWebpack: { resolve: { alias: { 'vue$': 'vue/dist/vue.esm.js' } } }
+  configureWebpack: { resolve: { alias: { 'vue$': 'vue/dist/vue.esm.js' } } },
+  chainWebpack(config) {
+    config.plugin('html').tap(args => {
+      args[0].title = 'JQ MUSIC'
+      return args
+    })
+  }
 }
